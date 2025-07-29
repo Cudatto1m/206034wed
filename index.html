@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Web Lưu Mật Khẩu 🔐</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 0 auto; padding: 20px; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; }
+    #accounts { margin-top: 20px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>🗝️ Lưu tài khoản của tôi</h2>
+  <div id="status">🔒 Chưa đăng nhập</div>
+  <button onclick="login()">🔑 Đăng nhập Google</button>
+  <button onclick="logout()">🚪 Đăng xuất</button>
+  <br><br>
+
+  <input id="user" placeholder="Tên tài khoản">
+  <input id="pass" placeholder="Mật khẩu" type="password">
+  <button onclick="save()">💾 Lưu</button>
+  <button onclick="load()">📂 Xem lại</button>
+
+  <div id="accounts"></div>
+
+  <script type="module">
+    // 1. Import các hàm cần thiết từ các SDK Firebase Modular
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"; // Giữ phiên bản 10.12.2 hoặc cập nhật lên 12.0.0
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    // Nếu bạn muốn dùng Analytics, hãy thêm vào:
+    // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+
+    // 2. Cấu hình Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXTQVya0GaJYTff_KDK8Sn0mmTJuHbS4g",
+      authDomain: "wed-luu-tt.firebaseapp.com",
+      projectId: "wed-luu-tt",
+      storageBucket: "wed-luu-tt.firebasestorage.app",
+      messagingSenderId: "1055841731330",
+      appId: "1:1055841731330:web:6f50a5d320fdfae7feb81b",
+      measurementId: "G-MD2TE7537J" // Nếu dùng Analytics
+    };
+
+    // 3. Khởi tạo Firebase và các dịch vụ
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app); // Lấy đối tượng Auth từ app
+    const db = getFirestore(app); // Lấy đối tượng Firestore từ app
+    let currentUser = null;
+
+    // Nếu bạn muốn dùng Analytics:
+    // const analytics = getAnalytics(app);
+
+    // 4. Các hàm xử lý logic của ứng dụng
+    // Theo dõi trạng thái đăng nhập
+    onAuthStateChanged(auth, (user) => { // Dùng onAuthStateChanged được import
+      currentUser = user;
+      document.getElementById("status").innerText = user
+        ? "✅ Đã đăng nhập: " + user.email
+        : "🔒 Chưa đăng nhập";
+    });
+
+    // Đăng nhập Google
+    window.login = () => { // Đặt hàm vào window để có thể gọi từ onclick
+      const provider = new GoogleAuthProvider(); // Dùng GoogleAuthProvider được import
+      signInWithPopup(auth, provider) // Dùng signInWithPopup được import
+        .then(res => alert("Đăng nhập thành công ✅"))
+        .catch(err => alert("Lỗi đăng nhập ❌: " + err.message));
+    }
+
+    // Đăng xuất
+    window.logout = () => { // Đặt hàm vào window
+      signOut(auth) // Dùng signOut được import
+        .then(() => alert("Đã đăng xuất ✅"))
+        .catch(err => alert("Lỗi khi đăng xuất ❌: " + err.message));
+    }
+
+    // Hàm mã hóa SHA-256 (giữ nguyên)
+    async function hash(text) {
+      const data = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return [...new Uint8Array(hashBuffer)]
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Lưu tài khoản
+    window.save = async () => { // Đặt hàm vào window
+      if (!currentUser) return alert("❗Bạn cần đăng nhập!");
+
+      const user = document.getElementById("user").value.trim();
+      const pass = document.getElementById("pass").value.trim();
+      if (!user || !pass) return alert("❗Hãy nhập đầy đủ!");
+
+      const hashed = await hash(pass);
+
+      // Sử dụng các hàm Firestore modular
+      const userDocRef = doc(collection(db, "users", currentUser.uid, "accounts"), user);
+      setDoc(userDocRef, { password: hashed })
+        .then(() => alert("✅ Đã lưu"))
+        .catch(err => alert("❌ Lỗi khi lưu: " + err.message));
+    }
+
+    // Xem lại tài khoản đã lưu
+    window.load = () => { // Đặt hàm vào window
+      if (!currentUser) return alert("❗Bạn cần đăng nhập!");
+
+      // Sử dụng các hàm Firestore modular
+      const accountsCollectionRef = collection(db, "users", currentUser.uid, "accounts");
+      getDocs(accountsCollectionRef)
+        .then(snapshot => {
+          if (snapshot.empty) return document.getElementById("accounts").innerHTML = "Không có dữ liệu";
+          let html = "<h3>📋 Danh sách tài khoản:</h3><ul>";
+          snapshot.forEach(doc => {
+            html += `<li><b>${doc.id}</b>: ${doc.data().password}</li>`;
+          });
+          html += "</ul>";
+          document.getElementById("accounts").innerHTML = html;
+        })
+        .catch(err => alert("❌ Lỗi khi tải dữ liệu: " + err.message));
+    }
+  </script>
+</body>
+</html>
