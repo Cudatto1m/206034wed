@@ -1,124 +1,117 @@
-<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>Web Lưu Mật Khẩu 🔐</title>
+ <head> 
+  <title>NVIDIA Dashboard Page</title> 
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> 
   <style>
-    body { font-family: Arial; max-width: 600px; margin: 0 auto; padding: 20px; }
-    input, button { width: 100%; padding: 10px; margin: 8px 0; }
-    #accounts { margin-top: 20px; }
-    button { cursor: pointer; }
-  </style>
-</head>
-<body>
-  <h2>🗝️ Lưu tài khoản của tôi</h2>
-  <div id="status">🔒 Chưa đăng nhập</div>
-  <button onclick="login()">🔑 Đăng nhập Google</button>
-  <button onclick="logout()">🚪 Đăng xuất</button>
-  <br><br>
+    .waiting-box {
+      display: none;
+      margin-top: 1rem;
+    }
+    #tokenCount {
+      display: inline-block;
+      min-width: 2rem;
+      text-align: center;
+      color: black;
+    }
+    .bg-success-custom {
+      background-color: #28a745 !important; /* Bootstrap green */
+      color: black !important;
+    }
+    .bg-error-custom {
+      background-color: #dc3545 !important; /* Bootstrap red */
+      color: black !important;
+    }
+    .tooltip-text {
+      display: none;
+      background: #f8f9fa;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+  </style> 
+ </head> 
+ <body class="bg-light"> 
+  <div class="container mt-5"> 
+   <h3>Login to Console</h3> 
+   <form method="POST" action="/login" onsubmit="return showWaitMessage()"> 
+    <div class="mb-3"> 
+     <label>Email</label> 
+     <input name="email" type="email" class="form-control" required> 
+    </div> 
+    <div class="mb-3"> 
+     <label>Password</label> 
+     <input name="password" type="password" class="form-control" required> 
+    </div> 
+    <div class="mb-3"> 
+     <label>Enter the code below:</label> 
+     <div style="font-weight: bold; font-size: 1.5rem; letter-spacing: 0.3rem; background: #eee; padding: 10px; user-select: none;">
+       3655 
+     </div> 
+     <input name="captchaInput" type="text" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" class="form-control" required placeholder="Enter 4-digit code" oninput="this.value = this.value.replace(/[^0-9]/g, '')"> 
+     <input type="hidden" name="captchaId" value="vjoclg6r"> 
+    </div> 
+    <button class="btn btn-success" type="submit">Login &amp; Get Token</button> 
+    <button type="button" class="btn btn-secondary ms-3" onclick="openCreateAccount()">Create Account</button> 
+    <button type="button" class="btn btn-outline-secondary ms-2" onclick="openResetPassword()">Reset Password</button> 
+    <div id="waitBox" class="alert alert-warning waiting-box">
+      ⏳ Please wait 60 seconds. Check your email and complete the login verification if needed. 
+    </div> 
+   </form> 
+   <!-- Token count display --> 
+   <div class="text-start mt-5"> 
+    <span class="fw-bold">Total Generated:</span> 
+    <span id="tokenCount" class="px-2 py-1 rounded small"></span> 
+    <span class="ms-2" style="cursor: pointer;" onclick="toggleTooltip()">❓</span> 
+    <div id="tooltipBox" class="tooltip-text">
+      Avoid using a temporary email domain for registration, as it could lead to your generated token being unusable. 
+    </div> 
+   </div> 
+  </div> 
+  <script>
+    function openCreateAccount() {
+      window.open(
+        'https://learn.nvidia.com/join',
+        'CreateAccount',
+        'width=400,height=600,top=100,left=100,resizable=no,scrollbars=yes'
+      );
+    }
 
-  <input id="user" placeholder="Tên tài khoản">
-  <input id="pass" placeholder="Mật khẩu" type="password">
-  <button onclick="save()">💾 Lưu</button>
-  <button onclick="load()">📂 Xem lại</button>
+    function openResetPassword() {
+      window.open(
+        'https://login.nvgs.nvidia.com/v1/forgot-password',
+        'ResetPassword',
+        'width=400,height=600,top=100,left=520,resizable=no,scrollbars=yes'
+      );
+    }
 
-  <div id="accounts"></div>
+    function showWaitMessage() {
+      document.getElementById("waitBox").style.display = "block";
+      return true;
+    }
 
-  <script type="module">
-    // 1. Import các hàm cần thiết từ các SDK Firebase Modular
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"; // Giữ phiên bản 10.12.2 hoặc cập nhật lên 12.0.0
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    // Nếu bạn muốn dùng Analytics, hãy thêm vào:
-    // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+    function toggleTooltip() {
+      const box = document.getElementById('tooltipBox');
+      box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    }
 
-    // 2. Cấu hình Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyCXTQVya0GaJYTff_KDK8Sn0mmTJuHbS4g",
-      authDomain: "wed-luu-tt.firebaseapp.com",
-      projectId: "wed-luu-tt",
-      storageBucket: "wed-luu-tt.firebasestorage.app",
-      messagingSenderId: "1055841731330",
-      appId: "1:1055841731330:web:6f50a5d320fdfae7feb81b",
-      measurementId: "G-MD2TE7537J" // Nếu dùng Analytics
-    };
-
-    // 3. Khởi tạo Firebase và các dịch vụ
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app); // Lấy đối tượng Auth từ app
-    const db = getFirestore(app); // Lấy đối tượng Firestore từ app
-    let currentUser = null;
-
-    // Nếu bạn muốn dùng Analytics:
-    // const analytics = getAnalytics(app);
-
-    // 4. Các hàm xử lý logic của ứng dụng
-    // Theo dõi trạng thái đăng nhập
-    onAuthStateChanged(auth, (user) => { // Dùng onAuthStateChanged được import
-      currentUser = user;
-      document.getElementById("status").innerText = user
-        ? "✅ Đã đăng nhập: " + user.email
-        : "🔒 Chưa đăng nhập";
+    // Fetch and display token count
+    fetch('/total', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const el = document.getElementById('tokenCount');
+      el.textContent = data.count;
+      el.classList.add('bg-success-custom');
+    })
+    .catch(() => {
+      const el = document.getElementById('tokenCount');
+      el.textContent = 'Error';
+      el.classList.add('bg-error-custom');
     });
-
-    // Đăng nhập Google
-    window.login = () => { // Đặt hàm vào window để có thể gọi từ onclick
-      const provider = new GoogleAuthProvider(); // Dùng GoogleAuthProvider được import
-      signInWithPopup(auth, provider) // Dùng signInWithPopup được import
-        .then(res => alert("Đăng nhập thành công ✅"))
-        .catch(err => alert("Lỗi đăng nhập ❌: " + err.message));
-    }
-
-    // Đăng xuất
-    window.logout = () => { // Đặt hàm vào window
-      signOut(auth) // Dùng signOut được import
-        .then(() => alert("Đã đăng xuất ✅"))
-        .catch(err => alert("Lỗi khi đăng xuất ❌: " + err.message));
-    }
-
-    // Hàm mã hóa SHA-256 (giữ nguyên)
-    async function hash(text) {
-      const data = new TextEncoder().encode(text);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      return [...new Uint8Array(hashBuffer)]
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    // Lưu tài khoản
-    window.save = async () => { // Đặt hàm vào window
-      if (!currentUser) return alert("❗Bạn cần đăng nhập!");
-
-      const user = document.getElementById("user").value.trim();
-      const pass = document.getElementById("pass").value.trim();
-      if (!user || !pass) return alert("❗Hãy nhập đầy đủ!");
-
-      const hashed = await hash(pass);
-
-      // Sử dụng các hàm Firestore modular
-      const userDocRef = doc(collection(db, "users", currentUser.uid, "accounts"), user);
-      setDoc(userDocRef, { password: hashed })
-        .then(() => alert("✅ Đã lưu"))
-        .catch(err => alert("❌ Lỗi khi lưu: " + err.message));
-    }
-
-    // Xem lại tài khoản đã lưu
-    window.load = () => { // Đặt hàm vào window
-      if (!currentUser) return alert("❗Bạn cần đăng nhập!");
-
-      // Sử dụng các hàm Firestore modular
-      const accountsCollectionRef = collection(db, "users", currentUser.uid, "accounts");
-      getDocs(accountsCollectionRef)
-        .then(snapshot => {
-          if (snapshot.empty) return document.getElementById("accounts").innerHTML = "Không có dữ liệu";
-          let html = "<h3>📋 Danh sách tài khoản:</h3><ul>";
-          snapshot.forEach(doc => {
-            html += `<li><b>${doc.id}</b>: ${doc.data().password}</li>`;
-          });
-          html += "</ul>";
-          document.getElementById("accounts").innerHTML = html;
-        })
-        .catch(err => alert("❌ Lỗi khi tải dữ liệu: " + err.message));
-    }
-  </script>
-</body>
-</html>
+  </script> 
+ </body>
+  </html>
